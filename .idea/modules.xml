@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/auto-eval-gnns.iml" filepath="$PROJECT_DIR$/.idea/auto-eval-gnns.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/auto-eval-gnn.iml" filepath="$PROJECT_DIR$/.idea/auto-eval-gnn.iml" />
     </modules>
   </component>
 </project>
