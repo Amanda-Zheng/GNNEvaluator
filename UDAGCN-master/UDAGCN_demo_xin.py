@@ -250,7 +250,7 @@ def train(epoch):
     # rate = min((epoch + 1) / epochs, 0.05)
 
     encoded_source = encode(source_data, "source")
-    # encoded_target = encode(target_data, "target")
+    #encoded_target = encode(target_data, "target")
     source_logits = cls_model(encoded_source)
 
     # use source classifier loss:
