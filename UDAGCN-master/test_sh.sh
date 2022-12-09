@@ -47,3 +47,12 @@ CUDA_VISIBLE_DEVICES=0 python UDAGCN_demo_xin_tmp.py --seed=0 \
 11/15 02:22:53 PM Namespace(UDAGCN=False, encoder_dim=16, epochs=300, full_s=0, lr=0.005, model='GCN', name='UDAGCN', seed=0, source='acm', target='dblp')
 11/15 02:22:53 PM Finish!, this is the log dir: ./logs/acm-to-dblp-GCN-full-0-0-20221115-141922-840800
 
+CUDA_VISIBLE_DEVICES=0 python auto-eval-main.py --seed=0 \
+--lr 5e-3 --epochs 300 --model GCN --full_s 0 --encoder_dim 16 --edge_drop_all_p 0.1
+./logs/acm-to-dblp-GCN-full-0-0-20221209-212631-998242
+
+CUDA_VISIBLE_DEVICES=0 python auto-eval-main.py --seed=0 \
+--lr 5e-3 --epochs 300 --model GCN --full_s 0 --encoder_dim 16 --edge_drop_all_p 0.6
+this is the log dir: ./logs/acm-to-dblp-GCN-full-0-0-20221209-213413-345509
+
+
