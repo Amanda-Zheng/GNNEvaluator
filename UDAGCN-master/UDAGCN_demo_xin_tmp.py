@@ -6,10 +6,11 @@ from argparse import ArgumentParser
 from dual_gnn.cached_gcn_conv import CachedGCNConv
 from dual_gnn.dataset.DomainData import DomainData
 from dual_gnn.ppmi_conv import PPMIConv
+from meta_data_create import EdgeDrop_all,NodeDrop_val
 import random
 import numpy as np
 import torch
-import torch.functional as F
+import torch.nn.functional as F
 from torch import nn
 import itertools
 import datetime
@@ -82,32 +83,7 @@ s_test_mask = source_data.test_mask.to(torch.bool)
 #print(sum(s_train_mask_oh-source_data.train_mask))
 
 
-class NodeDrop(nn.Module):
-    def __init__(self, p=0.05):
-        super().__init__()
-        self.p = p
 
-    def forward(self, data):
-        x = copy.deepcopy(data.x)
-        y = copy.deepcopy(data.y)
-        train_mask = copy.deepcopy(data.train_mask)
-        test_mask = copy.deepcopy(data.test_mask)
-        val_mask = copy.deepcopy(data.val_mask)
-        edge_idx = copy.deepcopy(data.edge_index)
-        idx = torch.empty(x.size(0)).uniform_(0, 1)
-        print(torch.where(idx < self.p))
-        print(sum(train_mask[torch.where(idx < self.p)]),sum(data.train_mask[torch.where(idx < self.p)]))
-        train_mask[torch.where(idx < self.p)] = 0
-        print('after', sum(train_mask[torch.where(idx < self.p)]), sum(data.train_mask[torch.where(idx < self.p)]))
-        print(sum(test_mask[torch.where(idx < self.p)]))
-        test_mask[torch.where(idx < self.p)] = 0
-        print('after',sum(test_mask[torch.where(idx < self.p)]))
-        print(sum(val_mask[torch.where(idx < self.p)]))
-        val_mask[torch.where(idx < self.p)] = 0
-        print('after',sum(val_mask[torch.where(idx < self.p)]))
-        new_data = tg.data.Data(x=x, edge_index=edge_idx, y=y, train_mask=train_mask, val_mask = val_mask, test_mask=test_mask)
-
-        return new_data
 '''
 class NodeDrop_val(nn.Module):
     def __init__(self, p=0.05):
@@ -125,11 +101,19 @@ class NodeDrop_val(nn.Module):
 #new_data = node_aug(source_data)
 #diff_train_mask = source_data.train_mask - new_data.train_mask
 #print(diff_train_mask)
-aug_node_drop_full = NodeDrop(p=0.5)
-aug_data = aug_node_drop_full(source_data)
-diff_train_mask = sum(source_data.train_mask - aug_data.train_mask)
-print('diff_train_mask',diff_train_mask)
+aug_edge_drop_all = EdgeDrop_all(p=0.2)
+aug_edge_data  = aug_edge_drop_all(source_data).to(device)
+aug_train_mask = aug_edge_data.train_mask.to(torch.bool)
+aug_val_mask = aug_edge_data.val_mask.to(torch.bool)
+aug_test_mask = aug_edge_data.test_mask.to(torch.bool)
+#diff_edge  = aug_edge_data.edge_index - source_data.edge_index
+print(aug_edge_data.edge_index.shape, source_data.edge_index.shape)
+#aug_node_drop_val = NodeDrop_val(p=0.5)
+#aug_data = aug_node_drop_val(source_data)
+#diff_train_mask = sum(source_data.train_mask - aug_data.train_mask)
+#print('diff_train_mask',diff_train_mask)
 #diff_val_mask = sum(source_data.val_mask - aug_data.val_mask)
+#print('diff_val_mask', diff_val_mask)
 #diff_test_mask = sum(source_data.test_mask - aug_data.test_mask)
 #print(diff_train_mask, diff_val_mask, diff_test_mask)
 #aug_node_drop_val = NodeDrop_val(p=args.node_drop_val_p)
@@ -472,6 +456,7 @@ def train(epoch):
 
     encoded_source = encode(source_data, "source")
     encoded_target = encode(target_data, "target")
+    encoded_aug = encode(aug_edge_data, "meta")
     # mmd_diss = MMD_loss()
 
     t_emb_full = encoded_target
@@ -480,27 +465,36 @@ def train(epoch):
     s_emb_val = encoded_source[s_val_mask, :]
     s_emb_test = encoded_source[s_test_mask, :]
 
-    s_train_mu = torch.mean(s_emb_train, dim=0).cpu().detach().numpy()
-    s_train_sigma = torch.cov(s_emb_train).cpu().detach().numpy()
+    aug_emb_val = encoded_aug[aug_val_mask,:]
+
+    #encoded_aug_data
+
+    # s_train_mu = torch.mean(s_emb_train, dim=0).cpu().detach().numpy()
+    # s_train_sigma = torch.cov(s_emb_train).cpu().detach().numpy()
     # s_train_sigma = np.cov(s_emb_train, rowvar=False)
 
     # s_val_mu = np.mean(s_emb_val, axis=0)
     # s_val_sigma = np.cov(s_emb_val, rowvar=False)
 
-    s_val_mu = torch.mean(s_emb_val, dim=0).cpu().detach().numpy()
-    s_val_sigma = torch.cov(s_emb_val).cpu().detach().numpy()
+    # s_val_mu = torch.mean(s_emb_val, dim=0).cpu().detach().numpy()
+    # s_val_sigma = torch.cov(s_emb_val).cpu().detach().numpy()
 
-    dist_s_tra_s_val = mmd(s_emb_train, s_emb_val)
-    dist_s_tra_t_ful = mmd(s_emb_train, t_emb_full)
-    dist_s_val_t_ful = mmd(s_emb_val, t_emb_full)
+    dist_s_tra_aug_val = mmd(s_emb_train, aug_emb_val)
+    #dist_s_tra_s_val = mmd(s_emb_train, s_emb_val)
+    #dist_s_tra_t_ful = mmd(s_emb_train, t_emb_full)
+    #dist_s_val_t_ful = mmd(s_emb_val, t_emb_full)
     # dist = mmd_diss.forward(s_emb_train,s_emb_val)
     # fd_value = calculate_frechet_distance(s_train_mu, s_train_sigma, s_val_mu, s_val_sigma)
+    #logging.info(
+    #    'this is the mmd_value in {}-th epoch: dist_s_tra_s_val = {}, dist_s_tra_t_ful = {}, dist_s_val_t_ful = {}'.format(
+    #        epoch, dist_s_tra_s_val, dist_s_tra_t_ful, dist_s_val_t_ful))
+    #writer.add_scalar('curve/mmd_dist_s_tra_s_val_seed_' + str(seed), dist_s_tra_s_val, epoch)
+    #writer.add_scalar('curve/mmd_dist_s_tra_t_ful_seed_' + str(seed), dist_s_tra_t_ful, epoch)
+    #writer.add_scalar('curve/mmd_dist_s_val_t_ful_seed_' + str(seed), dist_s_val_t_ful, epoch)
     logging.info(
-        'this is the mmd_value in {}-th epoch: dist_s_tra_s_val = {}, dist_s_tra_t_ful = {}, dist_s_val_t_ful = {}'.format(
-            epoch, dist_s_tra_s_val, dist_s_tra_t_ful, dist_s_val_t_ful))
-    writer.add_scalar('curve/mmd_dist_s_tra_s_val_seed_' + str(seed), dist_s_tra_s_val, epoch)
-    writer.add_scalar('curve/mmd_dist_s_tra_t_ful_seed_' + str(seed), dist_s_tra_t_ful, epoch)
-    writer.add_scalar('curve/mmd_dist_s_val_t_ful_seed_' + str(seed), dist_s_val_t_ful, epoch)
+        'this is the mmd_value in {}-th epoch: dist_s_tra_aug_val = {},'.format(
+            epoch, dist_s_tra_aug_val))
+    writer.add_scalar('curve/mmd_dist_s_tra_aug_val_' + str(seed), dist_s_tra_aug_val, epoch)
     # encoded_target = encode(target_data, "target")
     source_logits = cls_model(encoded_source)
 
