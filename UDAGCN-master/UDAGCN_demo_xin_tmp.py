@@ -1,4 +1,5 @@
 # coding=utf-8
+import copy
 import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from argparse import ArgumentParser
@@ -10,7 +11,6 @@ import numpy as np
 import torch
 import torch.functional as F
 from torch import nn
-import torch.nn.functional as F
 import itertools
 import datetime
 import sys
@@ -18,6 +18,8 @@ import logging
 from scipy import linalg
 from tensorboardX import SummaryWriter
 import torch_geometric as tg
+import grafog.transforms as T
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 parser = ArgumentParser()
@@ -29,7 +31,7 @@ parser.add_argument("--UDAGCN", type=bool, default=False)
 parser.add_argument("--encoder_dim", type=int, default=16)
 parser.add_argument("--lr", type=float, default=3e-3)
 parser.add_argument("--epochs", type=int, default=200)
-parser.add_argument("--model", type=str, default='SAGE')
+parser.add_argument("--model", type=str, default='GCN')
 parser.add_argument("--full_s", type=int, default=1)
 parser.add_argument("--node_drop_val_p", type=float, default=0.05)
 
@@ -72,7 +74,41 @@ s_train_mask = source_data.train_mask.to(torch.bool)
 s_val_mask = source_data.val_mask.to(torch.bool)
 s_test_mask = source_data.test_mask.to(torch.bool)
 
+#s_train_mask_oh = copy.deepcopy(source_data.train_mask)
+#idx = torch.empty(source_data.x.size(0)).uniform_(0, 1)
+#print(s_train_mask_oh[torch.where(idx < args.node_drop_val_p)])
+#s_train_mask_oh[torch.where(idx < args.node_drop_val_p)] = 0
+#print(s_train_mask_oh[torch.where(idx < args.node_drop_val_p)])
+#print(sum(s_train_mask_oh-source_data.train_mask))
 
+
+class NodeDrop(nn.Module):
+    def __init__(self, p=0.05):
+        super().__init__()
+        self.p = p
+
+    def forward(self, data):
+        x = copy.deepcopy(data.x)
+        y = copy.deepcopy(data.y)
+        train_mask = copy.deepcopy(data.train_mask)
+        test_mask = copy.deepcopy(data.test_mask)
+        val_mask = copy.deepcopy(data.val_mask)
+        edge_idx = copy.deepcopy(data.edge_index)
+        idx = torch.empty(x.size(0)).uniform_(0, 1)
+        print(torch.where(idx < self.p))
+        print(sum(train_mask[torch.where(idx < self.p)]),sum(data.train_mask[torch.where(idx < self.p)]))
+        train_mask[torch.where(idx < self.p)] = 0
+        print('after', sum(train_mask[torch.where(idx < self.p)]), sum(data.train_mask[torch.where(idx < self.p)]))
+        print(sum(test_mask[torch.where(idx < self.p)]))
+        test_mask[torch.where(idx < self.p)] = 0
+        print('after',sum(test_mask[torch.where(idx < self.p)]))
+        print(sum(val_mask[torch.where(idx < self.p)]))
+        val_mask[torch.where(idx < self.p)] = 0
+        print('after',sum(val_mask[torch.where(idx < self.p)]))
+        new_data = tg.data.Data(x=x, edge_index=edge_idx, y=y, train_mask=train_mask, val_mask = val_mask, test_mask=test_mask)
+
+        return new_data
+'''
 class NodeDrop_val(nn.Module):
     def __init__(self, p=0.05):
         super().__init__()
@@ -84,11 +120,21 @@ class NodeDrop_val(nn.Module):
         idx = torch.empty(x.size(0)).uniform_(0, 1)
         val_mask[torch.where(idx < self.p)] = 0
         return val_mask
-
-
-aug_node_drop_val = NodeDrop_val(p=args.node_drop_val_p)
-s_new_val_mask = aug_node_drop_val(source_data)
-diff_mask = sum(source_data.test_mask - s_new_val_mask)
+'''
+#node_aug = T.Compose([T.NodeDrop(p=0.45)])
+#new_data = node_aug(source_data)
+#diff_train_mask = source_data.train_mask - new_data.train_mask
+#print(diff_train_mask)
+aug_node_drop_full = NodeDrop(p=0.5)
+aug_data = aug_node_drop_full(source_data)
+diff_train_mask = sum(source_data.train_mask - aug_data.train_mask)
+print('diff_train_mask',diff_train_mask)
+#diff_val_mask = sum(source_data.val_mask - aug_data.val_mask)
+#diff_test_mask = sum(source_data.test_mask - aug_data.test_mask)
+#print(diff_train_mask, diff_val_mask, diff_test_mask)
+#aug_node_drop_val = NodeDrop_val(p=args.node_drop_val_p)
+#s_new_val_mask = aug_node_drop_val(source_data)
+#diff_mask = sum(source_data.test_mask - s_new_val_mask)
 # print(source_data.train_mask)
 # print(s_train_mask)
 # print(s_train_mask.dtype)
