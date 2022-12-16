@@ -65,11 +65,11 @@ class EdgeDrop_all(nn.Module):
         return new_data
 
 
-class NodeMixUp(nn.Module):
-    def __init__(self, lamb, classes):
+class NodeMixUp_all(nn.Module):
+    def __init__(self, lamb, num_classes):
         super().__init__()
         self.lamb = lamb
-        self.classes = classes
+        self.num_classes = num_classes
 
     def forward(self, data):
         x = copy.deepcopy(data.x)
@@ -98,7 +98,7 @@ class NodeMixUp(nn.Module):
         return new_data
 
 
-class NodeFeatureMasking(nn.Module):
+class NodeFeatureMasking_all(nn.Module):
     def __init__(self, p=0.15):
         super().__init__()
         self.p = p

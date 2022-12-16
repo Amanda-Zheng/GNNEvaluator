@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from dual_gnn.cached_gcn_conv import CachedGCNConv
 from dual_gnn.dataset.DomainData import DomainData
 from dual_gnn.ppmi_conv import PPMIConv
-from meta_data_create import EdgeDrop_all,NodeDrop_val
+from meta_data_create import EdgeDrop_all, NodeDrop_val, NodeMixUp_all, NodeFeatureMasking_all
 import random
 import numpy as np
 import torch
@@ -33,9 +33,18 @@ def main(args, device):
     dataset_t = DomainData("data/{}".format(args.target), name=args.target)
     target_data = dataset_t[0]
     logging.info(target_data)
-
-    aug_edge_drop_all = EdgeDrop_all(p=args.edge_drop_all_p)
-    aug_edge_data  = aug_edge_drop_all(source_data).to(device)
+    if args.aug_method == 'edge_drop':
+        aug_edge_drop_all = EdgeDrop_all(p=args.edge_drop_all_p)
+        aug_edge_data = aug_edge_drop_all(source_data).to(device)
+        aug_data = aug_edge_data
+    elif args.aug_method == 'node_mix':
+        aug_node_mix_all = NodeMixUp_all(lamb=args.mix_lamb, num_classes=source_data.num_classes)
+        aug_node_mix_data = aug_node_mix_all(source_data).to(device)
+        aug_data = aug_node_mix_data
+    elif args.aug_method == 'node_fmask':
+        aug_node_fmask_all = NodeFeatureMasking_all(p=args.node_fmask_all_p)
+        aug_node_fmask_data = aug_node_fmask_all(source_data).to(device)
+        aug_data = aug_node_fmask_data
 
     source_data = source_data.to(device)
     target_data = target_data.to(device)
@@ -47,7 +56,7 @@ def main(args, device):
         from torch_geometric.nn import GraphSAGE
         encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.encoder_dim, num_layers=2).to(device)
 
-    cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes),).to(device)
+    cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes), ).to(device)
 
     models = [encoder, cls_model]
 
@@ -57,11 +66,12 @@ def main(args, device):
     best_source_acc = 0.0
     best_target_acc = 0.0
     best_epoch = 0.0
-    dist_s_tra_aug_val = dist_aug_val_t_full=dist_s_val_t_full = 0
+    dist_s_tra_aug_val = dist_aug_val_t_full = dist_s_val_t_full = 0
     for epoch in range(1, args.epochs):
-        s_emb_train, s_emb_val, aug_emb_val, t_emb_full = train(epoch, models, encoder, cls_model, optimizer, loss_func, source_data, target_data, aug_edge_data)
-        source_correct = test(source_data, models, encoder, cls_model,"source", source_data.test_mask.to(torch.bool))
-        target_correct = test(target_data, models, encoder, cls_model,"target")
+        s_emb_train, s_emb_val, aug_emb_val, t_emb_full = train(epoch, models, encoder, cls_model, optimizer, loss_func,
+                                                                source_data, target_data, aug_data)
+        source_correct = test(source_data, models, encoder, cls_model, "source", source_data.test_mask.to(torch.bool))
+        target_correct = test(target_data, models, encoder, cls_model, "target")
         logging.info('Epoch: {}, source_acc: {}, target_acc: {}'.format(epoch, source_correct, target_correct))
         writer.add_scalar('curve/acc_target_seed_' + str(args.seed), target_correct, epoch)
         if target_correct > best_target_acc:
@@ -72,14 +82,14 @@ def main(args, device):
             dist_aug_val_t_full = mmd(aug_emb_val, t_emb_full)
             dist_s_val_t_full = mmd(s_emb_val, t_emb_full)
 
-
-            #writer.add_scalar('curve/mmd_dist_s_tra_aug_val_' + str(args.seed), dist_s_tra_aug_val, epoch)
+            # writer.add_scalar('curve/mmd_dist_s_tra_aug_val_' + str(args.seed), dist_s_tra_aug_val, epoch)
             # writer.add_scalar('curve/mmd_dist_aug_val_t_full_' + str(args.seed), dist_aug_val_t_full, epoch)
     # print("=============================================================")
 
     logging.info("=============================================================")
     line = "{} - Epoch: {}, best_source_acc: {}, best_target_acc: {}, dist_s_tra_aug_val = {},dist_aug_val_t_full = {}, dist_s_val_t_full={}" \
-        .format(id, best_epoch, best_source_acc, best_target_acc,dist_s_tra_aug_val, dist_aug_val_t_full,dist_s_val_t_full)
+        .format(id, best_epoch, best_source_acc, best_target_acc, dist_s_tra_aug_val, dist_aug_val_t_full,
+                dist_s_val_t_full)
 
     logging.info(line)
     logging.info(args)
@@ -87,7 +97,7 @@ def main(args, device):
 
 
 class GNN(torch.nn.Module):
-    def __init__(self, base_model=None, type="gcn", num_features=None,encoder_dim=None, **kwargs):
+    def __init__(self, base_model=None, type="gcn", num_features=None, encoder_dim=None, **kwargs):
         super(GNN, self).__init__()
 
         if base_model is None:
@@ -166,6 +176,7 @@ def test(data, models, encoder, cls_model, cache_name, mask=None):
     labels = data.y if mask is None else data.y[mask]
     accuracy = evaluate(preds, labels)
     return accuracy
+
 
 def guassian_kernel(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
     """计算Gram核矩阵
@@ -281,7 +292,6 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
 
 
 def train(epoch, models, encoder, cls_model, optimizer, loss_func, source_data, target_data, meta_data):
-
     s_train_mask = source_data.train_mask.to(torch.bool)
     s_val_mask = source_data.val_mask.to(torch.bool)
     s_test_mask = source_data.test_mask.to(torch.bool)
@@ -293,23 +303,19 @@ def train(epoch, models, encoder, cls_model, optimizer, loss_func, source_data, 
     for model in models:
         model.train()
 
-
     encoded_source = encode(source_data, encoder, "source")
     encoded_target = encode(target_data, encoder, "target")
-    encoded_aug = encode(meta_data, encoder,"meta")
-
+    encoded_aug = encode(meta_data, encoder, "meta")
 
     s_emb_train = encoded_source[s_train_mask, :]
     s_emb_val = encoded_source[s_val_mask, :]
     s_emb_test = encoded_source[s_test_mask, :]
 
-    aug_emb_val = encoded_aug[aug_val_mask,:]
+    aug_emb_val = encoded_aug[aug_val_mask, :]
 
     t_emb_full = encoded_target
 
-
     source_logits = cls_model(encoded_source)
-
 
     if args.full_s == 1:
         cls_loss = loss_func(source_logits, source_data.y)
@@ -329,7 +335,6 @@ def train(epoch, models, encoder, cls_model, optimizer, loss_func, source_data, 
     return s_emb_train, s_emb_val, aug_emb_val, t_emb_full
 
 
-
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--source", type=str, default='acm')
@@ -342,8 +347,12 @@ if __name__ == '__main__':
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--model", type=str, default='GCN')
     parser.add_argument("--full_s", type=int, default=1)
+    parser.add_argument("--aug_method", type=str, default='edge_drop', choices=['edge_drop', 'node_mix', 'node_fmask'], \
+                        help='method for augment data for creating the meta dataset')
     parser.add_argument("--node_drop_val_p", type=float, default=0.05)
     parser.add_argument("--edge_drop_all_p", type=float, default=0.05)
+    parser.add_argument("--node_fmask_all_p", type=float, default=0.05)
+    parser.add_argument("--mix_lamb", type=float, default=0.3, help='rational of mix features of nodes, ranges=[0,1]')
 
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -366,5 +375,4 @@ if __name__ == '__main__':
 
     # print(id)
     logging.info(id)
-    main(args,device)
-
+    main(args, device)
