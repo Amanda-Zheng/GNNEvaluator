@@ -38,13 +38,22 @@ def main(args, device):
         aug_edge_data = aug_edge_drop_all(source_data).to(device)
         aug_data = aug_edge_data
     elif args.aug_method == 'node_mix':
-        aug_node_mix_all = NodeMixUp_all(lamb=args.mix_lamb, num_classes=source_data.num_classes)
+        aug_node_mix_all = NodeMixUp_all(lamb=args.mix_lamb, num_classes=dataset_s.num_classes)
         aug_node_mix_data = aug_node_mix_all(source_data).to(device)
         aug_data = aug_node_mix_data
     elif args.aug_method == 'node_fmask':
         aug_node_fmask_all = NodeFeatureMasking_all(p=args.node_fmask_all_p)
         aug_node_fmask_data = aug_node_fmask_all(source_data).to(device)
         aug_data = aug_node_fmask_data
+    elif args.aug_method == 'combo':
+        aug_edge_drop_all = EdgeDrop_all(p=args.edge_drop_all_p)
+        aug_node_mix_all = NodeMixUp_all(lamb=args.mix_lamb, num_classes=dataset_s.num_classes)
+        aug_node_fmask_all = NodeFeatureMasking_all(p=args.node_fmask_all_p)
+        aug_edge_data_1 = aug_edge_drop_all(source_data).to(device)
+        aug_node_mix_data_2 = aug_node_mix_all(aug_edge_data_1).to(device)
+        aug_node_fmask_data_3 = aug_node_fmask_all(aug_node_mix_data_2).to(device)
+        aug_data = aug_node_fmask_data_3
+
 
     source_data = source_data.to(device)
     target_data = target_data.to(device)
@@ -356,8 +365,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    log_dir = './' + 'logs/{}-to-{}-{}-full-{}-{}-{}'.format(args.source, args.target, args.model, str(args.full_s),
-                                                             str(args.seed),
+    log_dir = './' + 'logs/{}-to-{}-{}-full-{}-{}-aug-{}-{}'.format(args.source, args.target, args.model, str(args.full_s),
+                                                             str(args.seed), str(args.aug_method),
                                                              datetime.datetime.now().strftime(
                                                                  "%Y%m%d-%H%M%S-%f"))
     if not os.path.exists(log_dir):

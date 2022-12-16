@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import copy
-from torch_geometric.loader import RandomNodeLoader
+#from torch_geometric.loader import RandomNodeLoader
 import torch_geometric as tg
 
 
@@ -84,8 +84,8 @@ class NodeMixUp_all(nn.Module):
         pair_idx = torch.randperm(n)
         x_b = x[pair_idx]
         y_b = y[pair_idx]
-        y_a_oh = F.one_hot(y, self.classes)
-        y_b_oh = F.one_hot(y_b, self.classes)
+        y_a_oh = F.one_hot(y, self.num_classes)
+        y_b_oh = F.one_hot(y_b, self.num_classes)
 
         x_mix = (self.lamb * x) + (1 - self.lamb) * x_b
         y_mix = (self.lamb * y_a_oh) + (1 - self.lamb) * y_b_oh
