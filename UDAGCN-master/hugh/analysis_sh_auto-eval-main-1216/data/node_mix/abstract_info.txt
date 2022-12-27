@@ -1,0 +1,72 @@
+record line: 1
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.48190054297447205
+dist_aug_val_t_full = 0.3955017924308777
+dist_s_val_t_full=0.7430351972579956
+
+
+record line: 4
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.49908432364463806
+dist_aug_val_t_full = 0.3920787572860718
+dist_s_val_t_full=0.7430351972579956
+
+
+record line: 7
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.46536731719970703
+dist_aug_val_t_full = 0.370816171169281
+dist_s_val_t_full=0.7430351972579956
+
+
+record line: 10
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.3877149820327759
+dist_aug_val_t_full = 0.3508865535259247
+dist_s_val_t_full=0.7430355548858643
+
+
+record line: 13
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.28708934783935547
+dist_aug_val_t_full = 0.35548773407936096
+dist_s_val_t_full=0.7430351972579956
+
+
+record line: 16
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.1871778964996338
+dist_aug_val_t_full = 0.39626777172088623
+dist_s_val_t_full=0.7430351972579956
+
+
+record line: 19
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.10535138845443726
+dist_aug_val_t_full = 0.46937716007232666
+dist_s_val_t_full=0.7430351972579956
+
+
+record line: 22
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.04893341660499573
+dist_aug_val_t_full = 0.5617672204971313
+dist_s_val_t_full=0.7430351972579956
+
+
+record line: 25
+best_source_acc: 0.8238866329193115
+best_target_acc: 0.6964861750602722
+dist_s_tra_aug_val = 0.016963660717010498
+dist_aug_val_t_full = 0.6604522466659546
+dist_s_val_t_full=0.7430355548858643
+
+
