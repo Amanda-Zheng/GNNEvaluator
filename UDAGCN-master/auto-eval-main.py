@@ -54,7 +54,6 @@ def main(args, device):
         aug_node_fmask_data_3 = aug_node_fmask_all(aug_node_mix_data_2).to(device)
         aug_data = aug_node_fmask_data_3
 
-
     source_data = source_data.to(device)
     target_data = target_data.to(device)
 
@@ -75,7 +74,7 @@ def main(args, device):
     best_source_acc = 0.0
     best_target_acc = 0.0
     best_epoch = 0.0
-    dist_s_tra_aug_val = dist_aug_val_t_full = dist_s_val_t_full = 0
+    dist_s_tra_aug_val = dist_aug_val_t_full = dist_t_full_aug_val = dist_s_val_t_full = 0
     for epoch in range(1, args.epochs):
         s_emb_train, s_emb_val, aug_emb_val, t_emb_full = train(epoch, models, encoder, cls_model, optimizer, loss_func,
                                                                 source_data, target_data, aug_data)
@@ -89,6 +88,7 @@ def main(args, device):
             best_epoch = epoch
             dist_s_tra_aug_val = mmd(s_emb_train, aug_emb_val)
             dist_aug_val_t_full = mmd(aug_emb_val, t_emb_full)
+            dist_t_full_aug_val = mmd(t_emb_full, aug_emb_val)
             dist_s_val_t_full = mmd(s_emb_val, t_emb_full)
 
             # writer.add_scalar('curve/mmd_dist_s_tra_aug_val_' + str(args.seed), dist_s_tra_aug_val, epoch)
@@ -96,8 +96,9 @@ def main(args, device):
     # print("=============================================================")
 
     logging.info("=============================================================")
-    line = "{} - Epoch: {}, best_source_acc: {}, best_target_acc: {}, dist_s_tra_aug_val = {},dist_aug_val_t_full = {}, dist_s_val_t_full={}" \
+    line = "{} - Epoch: {}, best_source_acc: {}, best_target_acc: {}, dist_s_tra_aug_val = {},dist_aug_val_t_full = {}, dist_t_full_aug_val = {}, dist_s_val_t_full={}" \
         .format(id, best_epoch, best_source_acc, best_target_acc, dist_s_tra_aug_val, dist_aug_val_t_full,
+                dist_t_full_aug_val,
                 dist_s_val_t_full)
 
     logging.info(line)
@@ -365,10 +366,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    log_dir = './' + 'logs/{}-to-{}-{}-full-{}-{}-aug-{}-{}'.format(args.source, args.target, args.model, str(args.full_s),
-                                                             str(args.seed), str(args.aug_method),
-                                                             datetime.datetime.now().strftime(
-                                                                 "%Y%m%d-%H%M%S-%f"))
+    log_dir = './' + 'logs/{}-to-{}-{}-full-{}-{}-aug-{}-{}'.format(args.source, args.target, args.model,
+                                                                    str(args.full_s),
+                                                                    str(args.seed), str(args.aug_method),
+                                                                    datetime.datetime.now().strftime(
+                                                                        "%Y%m%d-%H%M%S-%f"))
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     log_format = '%(asctime)s %(message)s'
