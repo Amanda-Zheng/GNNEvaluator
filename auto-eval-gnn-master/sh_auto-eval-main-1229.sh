@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=1 python pretrain-gcn.py --seed=0 \
+CUDA_VISIBLE_DEVICES=1 python pretrain_gnn.py --seed=0 --source acm --target dblp \
 --lr 5e-3 --wd 5e-4 --epochs 200 --model GCN --full_s 0 --hid_dim 128 --encoder_dim 16
 12/28 09:38:40 PM Epoch: 26, best_source_acc: 0.8441295027732849
 12/28 09:38:40 PM Namespace(encoder_dim=16, epochs=200, full_s=0, hid_dim=128, lr=0.005, model='GCN', seed=0, source='acm', wd=0.0005)

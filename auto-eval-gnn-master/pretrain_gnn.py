@@ -2,7 +2,7 @@
 import copy
 import os
 from argparse import ArgumentParser
-from torch_geometric.nn import GraphSAGE,GCN
+from torch_geometric.nn import GraphSAGE, GCN
 from dual_gnn.dataset.DomainData import DomainData
 import random
 import numpy as np
@@ -28,14 +28,21 @@ def main(args, device):
     source_data = dataset_s[0]
     logging.info(source_data)
 
+    dataset_t = DomainData("data/{}".format(args.target), name=args.target)
+    target_data = dataset_t[0]
+    logging.info(target_data)
+
     source_data = source_data.to(device)
+    target_data = target_data.to(device)
 
     loss_func = nn.CrossEntropyLoss().to(device)
 
     if args.model == 'GCN':
-        encoder = GCN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim, num_layers=2).to(device)
+        encoder = GCN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
     elif args.model == 'SAGE':
-        encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim, num_layers=2).to(device)
+        encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                            num_layers=2).to(device)
 
     cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes), ).to(device)
 
@@ -54,11 +61,12 @@ def main(args, device):
         if source_correct > best_source_acc:
             best_source_acc = source_correct
             best_epoch = epoch
-            torch.save(encoder.state_dict(),os.path.join(log_dir, 'encoder.pt'))
-            torch.save(cls_model.state_dict(), os.path.join(log_dir,'cls_model.pt'))
+            best_target_acc = test(target_data, models, encoder, cls_model)
+            torch.save(encoder.state_dict(), os.path.join(log_dir, 'encoder.pt'))
+            torch.save(cls_model.state_dict(), os.path.join(log_dir, 'cls_model.pt'))
 
-    line = "Epoch: {}, best_source_acc: {}" \
-        .format(best_epoch, best_source_acc)
+    line = "Epoch: {}, best_source_acc: {}, best_target_acc: {}" \
+        .format(best_epoch, best_source_acc, best_target_acc)
     logging.info(line)
     logging.info(args)
     logging.info('Finish!, this is the log dir = {}'.format(log_dir))
@@ -94,10 +102,10 @@ def train(models, encoder, cls_model, optimizer, loss_func, source_data):
     optimizer.step()
 
 
-
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--source", type=str, default='acm')
+    parser.add_argument("--target", type=str, default='dblp')
     parser.add_argument("--seed", type=int, default=200)
     parser.add_argument("--hid_dim", type=int, default=128)
     parser.add_argument("--encoder_dim", type=int, default=16)
@@ -109,11 +117,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    log_dir = './' + 'logs/{}-{}-full-{}-{}-{}'.format(args.source, args.model,
-                                                                    str(args.full_s),
-                                                                    str(args.seed),
-                                                                    datetime.datetime.now().strftime(
-                                                                        "%Y%m%d-%H%M%S-%f"))
+    log_dir = './' + 'logs/{}-to-{}-{}-full-{}-{}-{}'.format(args.source, args.target, args.model,
+                                                             str(args.full_s),
+                                                             str(args.seed),
+                                                             datetime.datetime.now().strftime(
+                                                                 "%Y%m%d-%H%M%S-%f"))
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
