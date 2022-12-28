@@ -96,11 +96,15 @@ def main(args, device):
     # print("=============================================================")
 
     logging.info("=============================================================")
-    line = "{} - Epoch: {}, best_source_acc: {}, best_target_acc: {}, dist_s_tra_aug_val = {},dist_aug_val_t_full = {}, dist_t_full_aug_val = {}, dist_s_val_t_full={}" \
-        .format(id, best_epoch, best_source_acc, best_target_acc, dist_s_tra_aug_val, dist_aug_val_t_full,
-                dist_t_full_aug_val,
-                dist_s_val_t_full)
-
+    #line = "{} - Epoch: {}, best_source_acc: {}, best_target_acc: {}, dist_s_tra_aug_val = {},dist_aug_val_t_full = {}, dist_t_full_aug_val = {}, dist_s_val_t_full={}" \
+    #    .format(id, best_epoch, best_source_acc, best_target_acc, dist_s_tra_aug_val, dist_aug_val_t_full,
+    #            dist_t_full_aug_val,
+    #            dist_s_val_t_full)
+    #line = "{} - Epoch: {}, best_source_acc: {}, best_target_acc: {}, dist_s_tra_aug_val = {},dist_aug_val_t_full = {}, dist_s_val_t_full={}" \
+    #    .format(id, best_epoch, best_source_acc, best_target_acc, dist_s_tra_aug_val, dist_aug_val_t_full,
+    #            dist_s_val_t_full)
+    line = "{} - Epoch: {}, best_source_acc: {}, best_target_acc: {}, dist_s_tra_aug_val = {},dist_aug_val_t_full = {}" \
+        .format(id, best_epoch, best_source_acc, best_target_acc, dist_s_tra_aug_val, dist_aug_val_t_full)
     logging.info(line)
     logging.info(args)
     logging.info('Finish!, this is the log dir: {}'.format(log_dir))
@@ -357,7 +361,7 @@ if __name__ == '__main__':
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--model", type=str, default='GCN')
     parser.add_argument("--full_s", type=int, default=1)
-    parser.add_argument("--aug_method", type=str, default='edge_drop', choices=['edge_drop', 'node_mix', 'node_fmask'], \
+    parser.add_argument("--aug_method", type=str, default='edge_drop', choices=['edge_drop', 'node_mix', 'node_fmask','combo'], \
                         help='method for augment data for creating the meta dataset')
     parser.add_argument("--node_drop_val_p", type=float, default=0.05)
     parser.add_argument("--edge_drop_all_p", type=float, default=0.05)
