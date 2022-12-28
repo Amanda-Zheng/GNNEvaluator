@@ -44,3 +44,16 @@ CUDA_VISIBLE_DEVICES=1 python meta_train_test.py --seed=0 \
 12/28 05:13:56 PM The size of meta data: feat = (300, 1), acc = (300, 1)
 12/28 05:13:56 PM Namespace(UDAGCN=False, aug_method='node_mix', edge_drop_all_p=0.8532459761585128, encoder_dim=16, full_s=0, mix_lamb=0.9692058717176852, model='GCN', name='UDAGCN', node_drop_val_p=0.05, node_fmask_all_p=0.4753247822120824, num_metas=300, save_path='./logs/acm-GCN-full-0-0-20221228-153442-415490/checkpoints/', seed=0, source='acm')
 12/28 05:13:56 PM Finish, this is the log dir = ./logs/acm-GCN-full-0-0-20221228-171336-369140
+
+CUDA_VISIBLE_DEVICES=1 python meta_regression.py --seed=0 \
+--source acm --target dblp --model GCN --encoder_dim 16 --val_num 30 \
+--model_path './logs/acm-GCN-full-0-0-20221228-153442-415490/checkpoints/' \
+--load_path './logs/acm-GCN-full-0-0-20221228-171336-369140/'
+12/28 08:22:11 PM Namespace(encoder_dim=16, load_path='./logs/acm-GCN-full-0-0-20221228-171336-369140/', model='GCN', model_path='./logs/acm-GCN-full-0-0-20221228-153442-415490/checkpoints/', seed=0, source='acm', target='dblp', val_num=30)
+12/28 08:22:11 PM Finish, this is the log dir = ./logs/metaLR-acm-to-dblp-GCN-0-20221228-202203-329412
+
+CUDA_VISIBLE_DEVICES=1 python meta_regression.py --seed=1 \
+--source acm --target dblp --model GCN --encoder_dim 16 --val_num 30 \
+--model_path './logs/acm-GCN-full-0-0-20221228-153442-415490/checkpoints/' \
+--load_path './logs/acm-GCN-full-0-0-20221228-171336-369140/'
+

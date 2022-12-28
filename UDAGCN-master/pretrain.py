@@ -99,7 +99,9 @@ class GNN(torch.nn.Module):
             x = conv_layer(x, edge_index, cache_name)
             if i < len(self.conv_layers) - 1:
                 x = F.relu(x)
+                print('before')
                 x = self.dropout_layers[i](x)
+                print('after')
         return x
 
 
