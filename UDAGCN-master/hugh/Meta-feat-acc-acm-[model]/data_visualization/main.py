@@ -23,10 +23,10 @@ def main(rootLocation):
         testLogs.append(rootLocation + '/' + folder + '/' + testLogFileName)
         modelNames.append(_get_model_name(folder))
 
-    for testLog in testLogs:
-        for i in range(len(targets)):
-            targetData = get_field_data(testLog, targets[i])
-            factorsData = [get_field_data(testLog, factor) for factor in factors]
+    for i in range(len(testLogs)):
+        for target in targets:
+            targetData = get_field_data(testLogs[i], target)
+            factorsData = [get_field_data(testLogs[i], factor) for factor in factors]
             generate_visual_graph(targetData, factorsData, modelNames[i])
 
 
