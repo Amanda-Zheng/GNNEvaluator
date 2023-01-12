@@ -4,7 +4,7 @@ import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from argparse import ArgumentParser
 from dual_gnn.dataset.DomainData import DomainData
-from torch_geometric.nn import GraphSAGE,GCN
+from torch_geometric.nn import GraphSAGE, GCN
 from meta_data_create import EdgeDrop_all, NodeDrop_val, NodeMixUp_all, NodeFeatureMasking_all
 import random
 import numpy as np
@@ -20,29 +20,115 @@ from tensorboardX import SummaryWriter
 import torch_geometric as tg
 import grafog.transforms as T
 import math
+from torch_geometric.utils import (
+    get_laplacian,
+    to_scipy_sparse_matrix,
+)
+from typing import Optional, Tuple, Union
+
+import torch
+from torch import Tensor
+from torch_scatter import scatter
+
+from torch_geometric.typing import OptTensor
+
+from torch_geometric.utils.num_nodes import maybe_num_nodes
+
+
+# from torch_geometric.transforms import AddLaplacianEigenvectorPE, AddRandomWalkPE
+def laplacian_pe(data, k):
+    from scipy.sparse.linalg import eigs
+    num_nodes = data.num_nodes
+    edge_index, edge_weight = get_laplacian(
+        data.edge_index,
+        data.edge_weight,
+        normalization='sym',
+        num_nodes=num_nodes,
+    )
+    L = to_scipy_sparse_matrix(edge_index, edge_weight, num_nodes)
+
+    eig_vals, eig_vecs = eigs(
+        L,
+        k=k + 1,
+        which='SR',
+        return_eigenvectors=True
+    )
+
+    eig_vecs = np.real(eig_vecs[:, eig_vals.argsort()])
+    pe = torch.from_numpy(eig_vecs[:, 1:k + 1])
+    sign = -1 + 2 * torch.randint(0, 2, (k,))
+    pe *= sign
+
+    return pe
+
+
+def random_walk_pe(data, walk_length):
+    from torch_sparse import SparseTensor
+
+    num_nodes = data.num_nodes
+    edge_index, edge_weight = data.edge_index, data.edge_weight
+
+    adj = SparseTensor.from_edge_index(edge_index, edge_weight,
+                                       sparse_sizes=(num_nodes, num_nodes))
+
+    # Compute D^{-1} A:
+    deg_inv = 1.0 / adj.sum(dim=1)
+    deg_inv[deg_inv == float('inf')] = 0
+    adj = adj * deg_inv.view(-1, 1)
+
+    out = adj
+    row, col, value = out.coo()
+    pe_list = [get_self_loop_attr((row, col), value, num_nodes)]
+    for _ in range(walk_length - 1):
+        out = out @ adj
+        row, col, value = out.coo()
+        pe_list.append(get_self_loop_attr((row, col), value, num_nodes))
+    pe = torch.stack(pe_list, dim=-1)
+    return pe
+
+
+def get_self_loop_attr(edge_index: Tensor, edge_attr: OptTensor = None,
+                       num_nodes: Optional[int] = None) -> Tensor:
+    loop_mask = edge_index[0] == edge_index[1]
+    loop_index = edge_index[0][loop_mask]
+
+    if edge_attr is not None:
+        loop_attr = edge_attr[loop_mask]
+    else:  # A vector of ones:
+        loop_attr = torch.ones_like(loop_index, dtype=torch.float)
+
+    num_nodes = maybe_num_nodes(edge_index, num_nodes)
+    full_loop_attr = loop_attr.new_zeros((num_nodes,) + loop_attr.size()[1:])
+    full_loop_attr[loop_index] = loop_attr
+
+    return full_loop_attr
 
 
 def main(args, device, encoder, cls_model, source_data, idx):
-    aug_data = torch.load(os.path.join(args.aug_data_path, 'aug_data_'+str(idx)+'.pt'),map_location=device)
+    aug_data = torch.load(os.path.join(args.aug_data_path, 'aug_data_' + str(idx) + '.pt'), map_location=device)
+    aug_data_L_pe = laplacian_pe(aug_data, k=args.k_laplacian)[aug_data.val_mask.to(torch.bool)]
+    mean_aug_data_L_pe = torch.mean(aug_data_L_pe, dim=0)
+    #aug_data_rw_pe = random_walk_pe(aug_data.to(cpu), walk_length=args.walk_length)[aug_data.val_mask.to(torch.bool)].cuda()
+    #mean_aug_data_rw_pe = torch.mean(aug_data_rw_pe, dim=0)
+    aug_data_rw_pe = mean_aug_data_rw_pe = 0
     source_data = source_data.to(device)
 
     models = [encoder, cls_model]
     for model in models:
         model.eval()
     aug_acc, aug_feat = test(aug_data, models, encoder, cls_model, mask=aug_data.val_mask.to(torch.bool))
-    #print(aug_data, source_data)
-    #print(aug_feat.shape)
-    #assert False
+
     emb_source = encoder(source_data.x, source_data.edge_index)
     s_train_mask = source_data.train_mask.to(torch.bool)
     s_emb_train = emb_source[s_train_mask, :]
 
     dist_s_tra_aug_val = mmd(s_emb_train, aug_feat)
 
-    lcka_score = linear_CKA(torch.t(s_emb_train).cpu().detach().numpy(),torch.t(aug_feat).cpu().detach().numpy())
-    kcka_score = kernel_CKA(torch.t(s_emb_train).cpu().detach().numpy(), torch.t(aug_feat).cpu().detach().numpy())
+    #lcka_score = linear_CKA(torch.t(s_emb_train).cpu().detach().numpy(), torch.t(aug_feat).cpu().detach().numpy())
+    #kcka_score = kernel_CKA(torch.t(s_emb_train).cpu().detach().numpy(), torch.t(aug_feat).cpu().detach().numpy())
+    lcka_score =kcka_score=0
+    return dist_s_tra_aug_val, lcka_score, kcka_score, aug_data_L_pe, mean_aug_data_L_pe, aug_data_rw_pe, mean_aug_data_rw_pe, aug_feat, aug_acc
 
-    return dist_s_tra_aug_val, lcka_score, kcka_score, aug_acc
 
 def centering(K):
     n = K.shape[0]
@@ -50,7 +136,8 @@ def centering(K):
     I = np.eye(n)
     H = I - unit / n
 
-    return np.dot(np.dot(H, K), H)  # HKH are the same with KH, KH is the first centering, H(KH) do the second time, results are the sme with one time centering
+    return np.dot(np.dot(H, K),
+                  H)  # HKH are the same with KH, KH is the first centering, H(KH) do the second time, results are the sme with one time centering
     # return np.dot(H, K)  # KH
 
 
@@ -90,6 +177,7 @@ def kernel_CKA(X, Y, sigma=None):
 
     return hsic / (var1 * var2)
 
+
 def test(data, models, encoder, cls_model, mask=None):
     for model in models:
         model.eval()
@@ -100,7 +188,7 @@ def test(data, models, encoder, cls_model, mask=None):
     corrects = preds.eq(labels)
     accuracy = corrects.float().mean()
     final_emb = emb_out if mask is None else emb_out[mask]
-    return accuracy,final_emb
+    return accuracy, final_emb
 
 
 def guassian_kernel(source, target, kernel_mul=2.0, kernel_num=5, fix_sigma=None):
@@ -216,15 +304,16 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
             np.trace(sigma2) - 2 * tr_covmean)
 
 
-
-def load(args,device):
+def load(args, device):
     dataset_s = DomainData("data/{}".format(args.source), name=args.source)
     source_data = dataset_s[0]
     logging.info(source_data)
     if args.model == 'GCN':
-        encoder = GCN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim, num_layers=2).to(device)
+        encoder = GCN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
     elif args.model == 'SAGE':
-        encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim, num_layers=2).to(device)
+        encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                            num_layers=2).to(device)
 
     cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes), ).to(device)
 
@@ -242,16 +331,18 @@ if __name__ == '__main__':
     parser.add_argument("--encoder_dim", type=int, default=16)
     parser.add_argument("--model", type=str, default='GCN')
     parser.add_argument("--num_metas", type=int, default=5)
+    parser.add_argument("--k_laplacian", type=int, default=5)
+    parser.add_argument("--walk_length", type=int, default=10)
     parser.add_argument("--model_path", type=str, default='./logs/acm-to-dblp-GCN-full-0-0-20221229-111920-594558/')
     parser.add_argument("--aug_data_path", type=str, default='./logs/Meta-save-acm-num-300-0-20221229-142336-945310/')
 
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     log_dir = './' + 'logs/Meta-feat-acc-{}-{}-num-{}-{}-{}'.format(args.source, args.model,
-                                                              str(args.num_metas),
-                                                              str(args.seed),
-                                                              datetime.datetime.now().strftime(
-                                                                  "%Y%m%d-%H%M%S-%f"))
+                                                                    str(args.num_metas),
+                                                                    str(args.seed),
+                                                                    datetime.datetime.now().strftime(
+                                                                        "%Y%m%d-%H%M%S-%f"))
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     log_format = '%(asctime)s %(message)s'
@@ -271,17 +362,49 @@ if __name__ == '__main__':
     cls_model.eval()
     meta_feat_ls = []
     meta_acc_ls = []
+    meta_pe_L_ls = []
+    meta_pe_L_mean_ls = []
+    meta_pe_rw_ls = []
+    meta_pe_rw_mean_ls = []
+    meat_emb_feat_ls = []
     for idx in range(0, args.num_metas):
-        dist_s_tra_aug_val, linear_cka_s, kernel_cka_s, aug_acc = main(args, device, encoder, cls_model, source_data, idx)
-        logging.info('FEAT = {}, linear_cka={}, kernel_cka_s = {}, ACC = {}'.format(dist_s_tra_aug_val, linear_cka_s, kernel_cka_s, aug_acc))
+        dist_s_tra_aug_val, linear_cka_s, kernel_cka_s, \
+        aug_data_L_pe, mean_aug_data_L_pe, aug_data_rw_pe, mean_aug_data_rw_pe, \
+        meat_emb_feat, aug_acc = main(args, device, encoder, cls_model, source_data, idx)
+        logging.info('FEAT = {}, linear_cka={}, kernel_cka_s = {}, ACC = {}'.format(dist_s_tra_aug_val, linear_cka_s,
+                                                                                    kernel_cka_s, aug_acc))
         meta_feat_ls.append(dist_s_tra_aug_val.detach().cpu().numpy())
+        meta_pe_L_ls.append(aug_data_L_pe.detach().cpu().numpy())
+        meta_pe_L_mean_ls.append(mean_aug_data_L_pe.detach().cpu().numpy())
+        #meta_pe_rw_ls.append(aug_data_rw_pe.detach().cpu().numpy())
+        #meta_pe_rw_mean_ls.append(mean_aug_data_rw_pe.detach().cpu().numpy())
         meta_acc_ls.append(aug_acc.detach().cpu().numpy())
+        meat_emb_feat_ls.append(meat_emb_feat.detach().cpu().numpy())
 
-    meta_feat_np = np.array(meta_feat_ls).reshape(-1,1)
-    meta_acc_np = np.array(meta_acc_ls).reshape(-1,1)
-    logging.info('The size of meta data: feat = {}, acc = {}'.format(meta_feat_np.shape, meta_acc_np.shape))
+    meta_feat_np = np.array(meta_feat_ls).reshape(-1, 1)
+    meta_acc_np = np.array(meta_acc_ls).reshape(-1, 1)
+    meta_pe_L_np = np.array(meta_pe_L_ls)
+    meta_pe_L_mean_np = np.array(meta_pe_L_mean_ls)
+    meat_emb_feat_np = np.array(meat_emb_feat_ls)
+    #meta_pe_rw_np = np.array(meta_pe_rw_ls)
+    #meta_pe_rw_mean_np = np.array(meta_pe_rw_mean_ls)
+    #logging.info('The size of meta data: feat = {}, '
+    #             'pe_L = {}, mean_pe_L = {}, '
+    #             'pe_rw = {}, mean_pe_rw = {}, acc = {}'.format(meta_feat_np.shape,\
+    #                                                            meta_pe_L_np.shape, meta_pe_L_mean_np.shape,\
+    #                                                            meta_pe_rw_np.shape, meta_pe_rw_mean_np.shape,\
+    #                                                            meta_acc_np.shape))
+    logging.info('The size of meta data: feat = {}, '
+                 'pe_L = {}, mean_pe_L = {}, meta_emb = {}, acc = {}'.format(meta_feat_np.shape,\
+                                                                meta_pe_L_np.shape, meta_pe_L_mean_np.shape,\
+                                                                meat_emb_feat_np.shape, meta_acc_np.shape))
 
-    np.save(os.path.join(log_dir,'meta_feat.npy'), meta_feat_np)
-    np.save(os.path.join(log_dir,'meta_acc.npy'), meta_acc_np)
+    np.save(os.path.join(log_dir, 'meta_feat.npy'), meta_feat_np)
+    np.save(os.path.join(log_dir, 'meta_acc.npy'), meta_acc_np)
+    np.save(os.path.join(log_dir, 'meta_pe_L.npy'), meta_pe_L_np)
+    np.save(os.path.join(log_dir, 'meta_pe_L_mean.npy'), meta_pe_L_mean_np)
+    np.save(os.path.join(log_dir, 'meat_emb_feat.npy'), meat_emb_feat_np)
+    #np.save(os.path.join(log_dir, 'meta_pe_rw.npy'), meta_pe_rw_np)
+    #np.save(os.path.join(log_dir, 'meta_pe_rw_mean_np.npy'), meta_pe_rw_mean_np)
     logging.info(args)
     logging.info('Finish, this is the log dir = {}'.format(log_dir))

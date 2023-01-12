@@ -12,12 +12,46 @@ from sklearn.metrics import r2_score
 import sys
 import random
 from dual_gnn.dataset.DomainData import DomainData
-from torch_geometric.nn import GraphSAGE,GCN
-from meta_train_test import mmd
+from torch_geometric.nn import GraphSAGE, GCN
+from meta_feat_acc import *
 import torch
 import torch.nn.functional as F
 from torch import nn
+import torch.nn.init as init
+import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
+from torch.autograd import Variable
 
+
+class RegNet(nn.Module):
+    def __init__(self, input_dim, pe_input_dim, hid_dim, dropout):
+        super(RegNet, self).__init__()
+        self.weight_pe = nn.Linear(pe_input_dim, 1).apply(kaiming_init)
+        self.fc1 = nn.Linear(input_dim, hid_dim).apply(kaiming_init)
+        self.fc2 = nn.Linear(hid_dim, 1).apply(kaiming_init)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x_feat, x_pe):
+        x_pe_weight = self.weight_pe(x_pe)
+        x_pe_out = x_pe_weight * x_pe
+
+        z = torch.cat([x_feat, x_pe_out], dim=1)
+        z = self.fc1(z)
+        z = F.relu(z)
+        z = self.dropout(z)
+        z = self.fc2(z)
+        output = z.view(-1)
+        return output
+
+def kaiming_init(m):
+    if isinstance(m, (nn.Linear, nn.Conv2d)):
+        init.kaiming_normal_(m.weight)
+        if m.bias is not None:
+            m.bias.data.fill_(0)
+    elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
+        m.weight.data.fill_(1)
+        if m.bias is not None:
+            m.bias.data.fill_(0)
 
 
 def test(data, models, encoder, cls_model, mask=None):
@@ -33,19 +67,35 @@ def test(data, models, encoder, cls_model, mask=None):
     return accuracy, final_emb
 
 
-def main(args, dist_s_tra_t_full, real_test_acc):
+def main(args, dist_s_tra_t_full, target_data_pe_mean, target_emb_feat_mu, real_test_acc):
     # data preparation
-    acc = np.load(os.path.join(args.load_path, 'meta_acc.npy'))
-    data = np.load(os.path.join(args.load_path, 'meta_feat.npy'))
+    acc_np = np.load(os.path.join(args.load_path, 'meta_acc.npy'))
+    acc = torch.from_numpy(acc_np).to(device)
+    acc_tensor = Variable(acc, requires_grad=True).to(device)
 
-    # Choose some sample sets as validation (also used in NN regression)
+    data_np = np.load(os.path.join(args.load_path, 'meta_feat.npy'))
+    data = torch.from_numpy(data_np).to(device)
+    data_tensor = Variable(data, requires_grad=True).to(device)
+
+    data_pe_np = np.load(os.path.join(args.load_path, 'meta_pe_L_mean.npy'))
+    data_pe = torch.from_numpy(data_pe_np).to(device)
+    data_pe_tensor = Variable(data_pe, requires_grad=True).to(device)
+
+    data_mu_np = np.load(os.path.join(args.load_path, 'meat_emb_feat.npy'))
+    data_mu = torch.mean(torch.from_numpy(data_mu_np), dim=1).to(device)
+    data_mu_tensor = Variable(data_mu, requires_grad=True).to(device)
+
     indice = args.val_num
-    train_data = data[indice:]
-    train_acc = acc[indice:]
-    test_data = train_data[:indice]
-    test_acc = train_acc[:indice]
+    train_data = data_tensor[indice:]
+    train_data_pe = data_pe_tensor[indice:]
+    train_data_mu = data_mu_tensor[indice:]
+    train_acc = acc_tensor[indice:]
 
-    # linear regression
+    test_data = data_tensor[:indice]
+    test_data_pe = data_pe_tensor[:indice]
+    test_data_mu = data_mu_tensor[:indice]
+    test_acc = acc_tensor[:indice]
+
     slr = LinearRegression()
     slr.fit(train_data, train_acc)
     test_pred = slr.predict(test_data)
@@ -64,16 +114,16 @@ def main(args, dist_s_tra_t_full, real_test_acc):
     ax.spines['left'].set_linewidth(2)
     ax.spines['right'].set_color('none')
     ax.spines['top'].set_color('none')
-    plt.savefig(os.path.join(log_dir,'linear_regression_train.png'))
+    plt.savefig(os.path.join(log_dir, 'linear_regression_train.png'))
     plt.close()
 
     # plot testing dataset
     plt.scatter(test_data, test_acc, color='red')
     plt.plot(test_data, slr.predict(test_data), color='blue')
-    plt.savefig(os.path.join(log_dir,'linear_regression_test.png'))
+    plt.savefig(os.path.join(log_dir, 'linear_regression_test.png'))
 
-    logging.info('If you could observe the linear correlation from figures, then your implementations are all good!')
-
+    logging.info(
+        'If you could observe the linear correlation from figures, then your implementations are all good!')
 
     # evaluation with metrics
     logging.info('Test on Validation Set..')
@@ -92,7 +142,6 @@ def main(args, dist_s_tra_t_full, real_test_acc):
     logging.info('Pearsons correlation-pval = {}'.format(pval))
 
 
-
 def load(args, device):
     dataset_s = DomainData("data/{}".format(args.source), name=args.source)
     source_data = dataset_s[0]
@@ -103,11 +152,20 @@ def load(args, device):
     target_data = dataset_t[0]
     logging.info(target_data)
     target_data = target_data.to(device)
-
+    target_data_pe_mean = np.load(
+        os.path.join("data/{}".format(args.target), 'target_data_pe_mean_np_k_' + str(args.k_laplacian) + '_.npy'))
+    target_data_pe_mean = torch.as_tensor(target_data_pe_mean, dtype=torch.float).to(device)
+    # target_data_pe = laplacian_pe(target_data, k=args.k_laplacian)
+    # target_data_pe_mean = torch.mean(target_data_pe,dim=0)
+    # target_data_pe_mean_np  = np.array(target_data_pe_mean.detach().cpu().numpy())
+    # np.save(os.path.join("data/{}".format(args.target), 'target_data_pe_mean_np_k_'+str(args.k_laplacian)+'_.npy'), target_data_pe_mean_np)
+    # assert False
     if args.model == 'GCN':
-        encoder = GCN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim, num_layers=2).to(device)
+        encoder = GCN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
     elif args.model == 'SAGE':
-        encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim, num_layers=2).to(device)
+        encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                            num_layers=2).to(device)
 
     cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes), ).to(device)
 
@@ -115,7 +173,7 @@ def load(args, device):
     cls_model.load_state_dict(torch.load(os.path.join(args.model_path, 'cls_model.pt'), map_location=device))
     encoder.eval()
     cls_model.eval()
-    return encoder, cls_model, dataset_s, source_data, dataset_t, target_data
+    return encoder, cls_model, dataset_s, source_data, dataset_t, target_data, target_data_pe_mean
 
 
 def real_target_test(source_data, target_data, encoder, cls_model):
@@ -129,7 +187,8 @@ def real_target_test(source_data, target_data, encoder, cls_model):
     s_train_mask = source_data.train_mask.to(torch.bool)
     s_emb_train = encoded_source[s_train_mask, :]
     dist_s_tra_t_full = mmd(s_emb_train, t_emb_feat)
-    return dist_s_tra_t_full, real_test_acc
+    t_emb_feat_mu = torch.mean(t_emb_feat, dim=0)
+    return dist_s_tra_t_full, t_emb_feat_mu, real_test_acc
 
 
 if __name__ == '__main__':
@@ -140,9 +199,11 @@ if __name__ == '__main__':
     parser.add_argument("--model", type=str, default='GCN')
     parser.add_argument("--hid_dim", type=int, default=128)
     parser.add_argument("--encoder_dim", type=int, default=16)
+    parser.add_argument("--k_laplacian", type=int, default=2)
+    parser.add_argument("--walk_length", type=int, default=10)
     parser.add_argument("--val_num", type=int, default=30, help='number of samples for validation in LR')
-    parser.add_argument("--model_path", type=str, default='./logs/acm-GCN-full-0-0-20221228-153442-415490/checkpoints/')
-    parser.add_argument("--load_path", type=str, default='./logs/acm-GCN-full-0-0-20221228-171336-369140/')
+    parser.add_argument("--model_path", type=str, default='./logs/acm-to-dblp-GCN-full-0-0-20221229-111920-594558/')
+    parser.add_argument("--load_path", type=str, default='./logs/Meta-feat-acc-acm-GCN-num-10-0-20230110-154700-625677')
 
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -161,9 +222,9 @@ if __name__ == '__main__':
     logging.info(args)
     random.seed(args.seed)
     np.random.seed(args.seed)
-    with torch.no_grad():
-        encoder, cls_model, dataset_s, source_data, dataset_t, target_data = load(args, device)
-        dist_s_tra_t_full, real_test_acc = real_target_test(source_data, target_data, encoder, cls_model)
-        main(args, dist_s_tra_t_full, real_test_acc)
+    encoder, cls_model, dataset_s, source_data, dataset_t, target_data, target_data_pe_mean = load(args, device)
+    dist_s_tra_t_full, target_emb_feat_mu, real_test_acc = real_target_test(source_data, target_data, encoder,
+                                                                            cls_model)
+    main(args, dist_s_tra_t_full, target_data_pe_mean, target_emb_feat_mu, real_test_acc)
     logging.info(args)
     logging.info('Finish, this is the log dir = {}'.format(log_dir))

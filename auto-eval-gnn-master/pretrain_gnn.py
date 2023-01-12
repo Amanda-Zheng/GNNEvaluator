@@ -51,22 +51,28 @@ def main(args, device):
     params = itertools.chain(*[model.parameters() for model in models])
     optimizer = torch.optim.Adam(params, lr=args.lr, weight_decay=args.wd)
 
-    best_source_acc = 0.0
+    best_s_val_acc = best_s_test_acc = 0.0
     best_epoch = 0.0
     for epoch in range(1, args.epochs):
-        train(models, encoder, cls_model, optimizer, loss_func, source_data)
-        source_correct = test(source_data, models, encoder, cls_model, mask=source_data.test_mask.to(torch.bool))
-        logging.info('Epoch: {}, source_acc: {}'.format(epoch, source_correct))
-        writer.add_scalar('curve/acc_source_seed_' + str(args.seed), source_correct, epoch)
-        if source_correct > best_source_acc:
-            best_source_acc = source_correct
+        s_train_acc, s_train_loss = train(models, encoder, cls_model, optimizer, loss_func, source_data)
+        s_val_acc = test(source_data, models, encoder, cls_model, mask=source_data.val_mask.to(torch.bool))
+        s_test_acc = test(source_data, models, encoder, cls_model, mask=source_data.test_mask.to(torch.bool))
+        logging.info('Epoch: {}, source_train_loss: {}, source_train_acc: {}, source_val_acc: {}, source_test_acc:{}'. \
+                     format(epoch, s_train_loss, s_train_acc, s_val_acc, s_test_acc))
+        writer.add_scalar('curve/acc_source_train_seed_' + str(args.seed), s_train_acc, epoch)
+        writer.add_scalar('curve/acc_source_val_seed_' + str(args.seed), s_val_acc, epoch)
+        writer.add_scalar('curve/acc_source_test_seed_' + str(args.seed), s_test_acc, epoch)
+        writer.add_scalar('curve/loss_source_train_seed_' + str(args.seed), s_train_loss, epoch)
+        if s_val_acc > best_s_val_acc:
+            best_s_val_acc = s_val_acc
+            best_s_test_acc = s_test_acc
             best_epoch = epoch
             best_target_acc = test(target_data, models, encoder, cls_model)
             torch.save(encoder.state_dict(), os.path.join(log_dir, 'encoder.pt'))
             torch.save(cls_model.state_dict(), os.path.join(log_dir, 'cls_model.pt'))
 
-    line = "Epoch: {}, best_source_acc: {}, best_target_acc: {}" \
-        .format(best_epoch, best_source_acc, best_target_acc)
+    line = "Best Epoch: {}, best_source_test_acc: {}, best_source_val_acc: {}, best_target_acc: {}" \
+        .format(best_epoch, best_s_test_acc, best_s_val_acc, best_target_acc)
     logging.info(line)
     logging.info(args)
     logging.info('Finish!, this is the log dir = {}'.format(log_dir))
@@ -93,13 +99,22 @@ def train(models, encoder, cls_model, optimizer, loss_func, source_data):
 
     if args.full_s == 1:
         cls_loss = loss_func(source_logits, source_data.y)
+        preds = source_logits.argmax(dim=1)
+        labels = source_data.y
     else:
         cls_loss = loss_func(source_logits[s_train_mask], source_data.y[s_train_mask])
+        preds = source_logits.argmax(dim=1)[s_train_mask]
+        labels = source_data.y[s_train_mask]
+
+    corrects = preds.eq(labels)
+    accuracy = corrects.float().mean()
 
     loss = cls_loss
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+
+    return accuracy, loss.item()
 
 
 if __name__ == '__main__':
