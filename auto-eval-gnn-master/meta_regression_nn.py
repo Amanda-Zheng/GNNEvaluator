@@ -12,7 +12,7 @@ from sklearn.metrics import r2_score
 import sys
 import random
 from dual_gnn.dataset.DomainData import DomainData
-from torch_geometric.nn import GraphSAGE, GCN
+from torch_geometric.nn import GraphSAGE, GCN, GAT, GIN, MLP
 from meta_feat_acc import *
 import torch
 import torch.nn.functional as F
@@ -162,6 +162,15 @@ def load(args, device):
     elif args.model == 'SAGE':
         encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
                             num_layers=2).to(device)
+    elif args.model == 'GAT':
+        encoder = GAT(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
+    elif args.model == 'GIN':
+        encoder = GIN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
+    elif args.model == 'MLP':
+        encoder = MLP(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
 
     cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes), ).to(device)
 

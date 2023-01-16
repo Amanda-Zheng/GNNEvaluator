@@ -4,7 +4,7 @@ import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 from argparse import ArgumentParser
 from dual_gnn.dataset.DomainData import DomainData
-from torch_geometric.nn import GraphSAGE, GCN
+from torch_geometric.nn import GraphSAGE, GCN, GAT, GIN, MLP
 from meta_data_create import EdgeDrop_all, NodeDrop_val, NodeMixUp_all, NodeFeatureMasking_all
 import random
 import numpy as np
@@ -314,6 +314,15 @@ def load(args, device):
     elif args.model == 'SAGE':
         encoder = GraphSAGE(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
                             num_layers=2).to(device)
+    elif args.model == 'GAT':
+        encoder = GAT(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
+    elif args.model == 'GIN':
+        encoder = GIN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
+    elif args.model == 'MLP':
+        encoder = MLP(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
+                      num_layers=2).to(device)
 
     cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes), ).to(device)
 
