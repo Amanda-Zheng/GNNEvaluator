@@ -11,7 +11,6 @@ CUDA_VISIBLE_DEVICES=1 python pretrain_gnn.py --seed=0 --source acm --target dbl
 CUDA_VISIBLE_DEVICES=1 python meta_set_save.py --seed=0 --source acm --num_metas 300
 # --> get aug_data_path
 #./logs/Meta-save-acm-num-300-0-20230117-162906-177221
-"
 
 # step 3
 CUDA_VISIBLE_DEVICES=1 python meta_feat_acc.py --seed=0 --source acm \
@@ -21,20 +20,21 @@ CUDA_VISIBLE_DEVICES=1 python meta_feat_acc.py --seed=0 --source acm \
 # --> get load_path
 #./logs/Meta-feat-acc-acm-GIN-num-300-0-20230119-091315-017978
 
-:"
 # step 4
 CUDA_VISIBLE_DEVICES=1 python meta_regression_nn.py --seed=0 \
 	--source acm --target dblp --model GIN --hid_dim 128 --encoder_dim 16 --val_num 30 --reg_model 'mlp_simple'\
 	--k_laplacian 5 --epochs_reg 200 --lr_reg 0.1 --dropout_reg 0 \
-	--model_path '$??' \
-	--load_path '$??'
+	--model_path './logs/acm-to-dblp-GIN-full-0-0-20230119-090839-975822' \
+	--load_path './logs/Meta-feat-acc-acm-GIN-num-300-0-20230119-091315-017978'
 # --> get our 'super model' which is trained based on the original given model
+#./logs/metaLR-acm-to-dblp-GIN-0-20230119-150714-883487
 
 # step 4
 CUDA_VISIBLE_DEVICES=1 python meta_regression_nn.py --seed=0 \
 	--source acm --target dblp --model GIN --hid_dim 128 --encoder_dim 16 --val_num 30 --reg_model 'mlp_simple'\
 	--k_laplacian 5 --epochs_reg 400 --lr_reg 0.1 --dropout_reg 0 \
-	--model_path '$??' \
-	--load_path '$??'
+	--model_path './logs/acm-to-dblp-GIN-full-0-0-20230119-090839-975822' \
+	--load_path './logs/Meta-feat-acc-acm-GIN-num-300-0-20230119-091315-017978'
 # --> get our 'super model' which is trained based on the original given model
+#./logs/metaLR-acm-to-dblp-GIN-0-20230119-151839-999216
 "
