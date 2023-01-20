@@ -51,7 +51,12 @@ def kaiming_init(m):
 def test(data, models, encoder, cls_model, mask=None):
     for model in models:
         model.eval()
-    emb_out = encoder(data.x, data.edge_index)
+
+    if isinstance(encoder, MLP):
+        emb_out = encoder(data.x)
+    else:
+        emb_out = encoder(data.x, data.edge_index)
+
     logits = cls_model(emb_out) if mask is None else cls_model(emb_out)[mask]
     preds = logits.argmax(dim=1)
     labels = data.y if mask is None else data.y[mask]
@@ -169,8 +174,7 @@ def load(args, device):
         encoder = GIN(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
                       num_layers=2).to(device)
     elif args.model == 'MLP':
-        encoder = MLP(source_data.num_node_features, hidden_channels=args.hid_dim, out_channels=args.encoder_dim,
-                      num_layers=2).to(device)
+        encoder = MLP(channel_list=[source_data.num_node_features,args.hid_dim, args.encoder_dim]).to(device)
 
     cls_model = nn.Sequential(nn.Linear(args.encoder_dim, dataset_s.num_classes), ).to(device)
 
@@ -188,7 +192,12 @@ def real_target_test(source_data, target_data, encoder, cls_model):
     real_test_acc, t_emb_feat = test(target_data, models, encoder, cls_model)
     encoder.eval()
     cls_model.eval()
-    encoded_source = encoder(source_data.x, source_data.edge_index)
+
+    if isinstance(encoder, MLP):
+        encoded_source = encoder(source_data.x)
+    else:
+        encoded_source = encoder(source_data.x, source_data.edge_index)
+
     s_train_mask = source_data.train_mask.to(torch.bool)
     s_emb_train = encoded_source[s_train_mask, :]
     dist_s_tra_t_full = mmd(s_emb_train, t_emb_feat)
