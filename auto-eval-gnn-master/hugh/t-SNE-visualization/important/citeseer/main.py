@@ -9,8 +9,8 @@ import glob
 
 
 def main():
-    labelPaths = glob.glob('**/label*best_ntk_score*.pt', recursive=True)
-    featPaths = glob.glob('**/feat*best_ntk_score*.pt', recursive=True)
+    labelPaths = glob.glob('distill/**/label*best_ntk_score*.pt', recursive=True)
+    featPaths = glob.glob('distill/**/feat*best_ntk_score*.pt', recursive=True)
     assert len(labelPaths) == len(featPaths)
     numberOfPaths = len(labelPaths)
 
@@ -24,9 +24,14 @@ def main():
 def generate_t_SNE_visualization(labelPath, featPath):
     labels = torch.load(labelPath, map_location=torch.device('cpu'))
     features = torch.load(featPath, map_location=torch.device('cpu'))
-    preplexity = math.ceil(len(labels) / 1.2)  # the value for preplexity cannot be more than the number of samples
+    if is_citeseer_1_0(labelPath):
+        perplexity = 8  # the value for perplexity cannot be more than the number of samples
+    elif is_citeseer_0_5(labelPath):
+        perplexity = 5  # the value for perplexity cannot be more than the number of samples
+    elif is_citeseer_0_25(labelPath):
+        perplexity = 10  # the value for perplexity cannot be more than the number of samples
 
-    tsne = TSNE(n_components=2, early_exaggeration=12, perplexity=preplexity, learning_rate='auto', n_iter=10000, init='pca', verbose=1, random_state=501)
+    tsne = TSNE(n_components=2, early_exaggeration=12, perplexity=perplexity, learning_rate='auto', n_iter=10000, init='pca', verbose=1, random_state=501)
     z = tsne.fit_transform(features)
 
     df = pd.DataFrame()
@@ -37,6 +42,18 @@ def generate_t_SNE_visualization(labelPath, featPath):
     sns.scatterplot(x='comp-1', y='comp-2', hue=df.y.tolist(), palette=sns.color_palette("hls", 6), data=df).set(title="t-SNE embedding")
 
     plt.show()
+
+
+def is_citeseer_0_5(path):
+    return path.find('citeseer_0.5') != -1
+
+
+def is_citeseer_1_0(path):
+    return path.find('citeseer_1.0') != -1
+
+
+def is_citeseer_0_25(path):
+    return path.find('citeseer_0.25') != -1
 
 
 if __name__ == "__main__":
