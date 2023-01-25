@@ -40,7 +40,6 @@ def generate_t_SNE_visualization(labelPath, featPath):
 
     sns.scatterplot(x='comp-1', y='comp-2', hue=df.y.tolist(), size=df.y.tolist(), sizes=(10, 100), palette="deep", legend="full", data=df).set(
         title="t-SNE embedding")
-    # sns.replot(data=df, x='comp-1', y='comp-2', kind="scatter")
 
     plt.show()
 
