@@ -4,7 +4,7 @@ import re
 def get_field_data(fieldName, fileLocation):
     f = open(fileLocation, 'r')
     content = f.read()
-    matched = re.findall(r"\b{}:\ *[0-9.]*\b".format(fieldName), content)
+    matched = re.findall(r"\b{}\ *[:=]\ *[0-9.]*\b".format(fieldName), content)
     f.close()
     return list(map(_abstract_info, matched))
 
