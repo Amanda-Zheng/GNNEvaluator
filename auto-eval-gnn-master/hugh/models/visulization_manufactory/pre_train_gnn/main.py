@@ -8,15 +8,11 @@ from get_field_data import get_field_data  # type: ignore
 
 
 def main():
-    PRE_TRAIN_TEST_LOG = os.path.abspath('../../GAT/acm-to-dblp-GAT-full-0-0-20230117-155857-034722/test.log')
-    source_train_loss = get_field_data('source_train_loss', PRE_TRAIN_TEST_LOG)
-    source_train_acc = get_field_data('source_train_acc', PRE_TRAIN_TEST_LOG)
-    source_val_acc = get_field_data('source_val_acc', PRE_TRAIN_TEST_LOG)
-    source_test_acc = get_field_data('source_test_acc', PRE_TRAIN_TEST_LOG)
-    print(len(source_train_loss))
-    print(len(source_train_acc))
-    print(len(source_val_acc))
-    print(len(source_test_acc))
+    LOG_PATH = os.path.abspath('../../GAT/acm-to-dblp-GAT-full-0-0-20230117-155857-034722/test.log')
+    source_train_loss = get_field_data('source_train_loss', LOG_PATH)
+    source_train_acc = get_field_data('source_train_acc', LOG_PATH)
+    source_val_acc = get_field_data('source_val_acc', LOG_PATH)
+    source_test_acc = get_field_data('source_test_acc', LOG_PATH)
     assert len(source_train_loss) == len(source_train_acc) == len(source_val_acc) == len(source_test_acc)
 
     plt.subplot(2, 1, 1)

@@ -9,9 +9,9 @@ from get_field_data import get_field_data  # type: ignore
 
 
 def main():
-    PRE_TRAIN_TEST_LOG = os.path.abspath('../../GAT/Meta-feat-acc-acm-GAT-num-300-0-20230117-175809-721176/test.log')
-    FEAT = get_field_data('FEAT', PRE_TRAIN_TEST_LOG)
-    ACC = get_field_data('ACC', PRE_TRAIN_TEST_LOG)
+    LOG_PATH = os.path.abspath('../../GAT/Meta-feat-acc-acm-GAT-num-300-0-20230117-175809-721176/test.log')
+    FEAT = get_field_data('FEAT', LOG_PATH)
+    ACC = get_field_data('ACC', LOG_PATH)
     groups = group_data(FEAT, ACC)  # -> [(FEAT, ACC), ...]
     sortedGroups = sorted(groups, key=sorted_aux, reverse=True)
     sortedFEAT, sortedACC = destruct_group_data(sortedGroups)
