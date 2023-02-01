@@ -6,9 +6,12 @@ sys.path.append(os.path.abspath('../utils'))
 
 from get_field_data import get_field_data  # type: ignore
 
+modelName = 'GAT'
+modelLogPath = '../../GAT/acm-to-dblp-GAT-full-0-0-20230117-155857-034722/test.log'
+
 
 def main():
-    LOG_PATH = os.path.abspath('../../GAT/acm-to-dblp-GAT-full-0-0-20230117-155857-034722/test.log')
+    LOG_PATH = os.path.abspath(modelLogPath)
     source_train_loss = get_field_data('source_train_loss', LOG_PATH)
     source_train_acc = get_field_data('source_train_acc', LOG_PATH)
     source_val_acc = get_field_data('source_val_acc', LOG_PATH)
@@ -16,7 +19,7 @@ def main():
     assert len(source_train_loss) == len(source_train_acc) == len(source_val_acc) == len(source_test_acc)
 
     plt.subplot(2, 1, 1)
-    plt.title("pre_train GAT", {'color': 'blue'})
+    plt.title("pre_train {}".format(modelName), {'color': 'blue'})
     plt.ylabel("source_train_loss", {'color': 'darkred'})
     plt.plot(source_train_loss)
 

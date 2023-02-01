@@ -7,9 +7,12 @@ sys.path.append(os.path.abspath('../utils'))
 
 from get_field_data import get_field_data  # type: ignore
 
+modelName = 'GAT'
+modelLogPath = '../../GAT/Meta-feat-acc-acm-GAT-num-300-0-20230117-175809-721176/test.log'
+
 
 def main():
-    LOG_PATH = os.path.abspath('../../GAT/Meta-feat-acc-acm-GAT-num-300-0-20230117-175809-721176/test.log')
+    LOG_PATH = os.path.abspath(modelLogPath)
     FEAT = get_field_data('FEAT', LOG_PATH)
     ACC = get_field_data('ACC', LOG_PATH)
     groups = group_data(FEAT, ACC)  # -> [(FEAT, ACC), ...]
@@ -17,7 +20,7 @@ def main():
     sortedFEAT, sortedACC = destruct_group_data(sortedGroups)
 
     plt.subplot(2, 1, 1)
-    plt.title("meta_feat_acc GAT", {'color': 'blue'})
+    plt.title("meta_feat_acc {}".format(modelName), {'color': 'blue'})
     plt.ylabel("FEAT", {'color': 'darkred'})
     plt.plot(sortedFEAT)
 

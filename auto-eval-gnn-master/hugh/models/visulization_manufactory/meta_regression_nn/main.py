@@ -6,9 +6,12 @@ sys.path.append(os.path.abspath('../utils'))
 
 from get_field_data import get_field_data  # type: ignore
 
+modelName = 'GAT'
+modelLogPath = '../../GAT/metaLR-acm-to-dblp-GAT-0-20230119-085903-270711/test.log'
+
 
 def main():
-    LOG_PATH = os.path.abspath('../../GAT/metaLR-acm-to-dblp-GAT-0-20230119-085903-270711/test.log')
+    LOG_PATH = os.path.abspath(modelLogPath)
     loss_test = get_field_data('loss_test', LOG_PATH)
     # R2 = get_field_data('R2', LOG_PATH)
     # RMSE = get_field_data('RMSE', LOG_PATH)
@@ -19,7 +22,7 @@ def main():
     assert len(loss_test) == len(predictTarget) == len(realTarget)
 
     plt.subplot(2, 1, 1)
-    plt.title("meta_regression_nn GAT", {'color': 'blue'})
+    plt.title("meta_regression_nn {}".format(modelName), {'color': 'blue'})
     plt.ylabel("loss_test", {'color': 'darkred'})
     plt.plot(loss_test)
 
