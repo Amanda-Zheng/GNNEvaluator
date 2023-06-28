@@ -1,8 +1,11 @@
 # GNNEvaluator: Evaluating GNN Performance On Unseen Graphs Without Labels
 
 This is the Pytorch implementation for "GNNEvaluator: Evaluating GNN Performance On Unseen Graphs Without Labels"
+We are trying to solve the GNN evaluation problem when serving on unseen graphs without labels as:
+![pre4](https://github.com/Amanda-Zheng/GNNEvaluator/assets/61812981/a4fbb479-7922-484d-8b4c-8e4940737fe7)
 
 The framework is:
+![GNN_eval9](https://github.com/Amanda-Zheng/GNNEvaluator/assets/61812981/690288a8-ed31-4b79-b994-2d7addb43234)
 
 
 
@@ -16,7 +19,7 @@ torch-sparse==0.6.16+pt113cu117
 ```
 ## Instructions
 ### For evaluating your own well-trained GNNs 
-(1) Run commands like in following to create simulated distribution shift from your source graphs (used for training your GNNs)
+(1) Run commands like in following to create a simulated distribution shift from your source graphs (used for training your GNNs)
 ```
 GNNEvaluator-git/1-Aug.sh
 ```
@@ -24,7 +27,7 @@ For instance,
 ```
 python meta_set_save_induct-1.py --source=${yourdataset} --num_metas=${yournums} --interval=${yourinterval}
 ```
-(2) Use the step-(1) obtained augmented graphs to create model-related Discgraph set with the unseen target graph with the commands like in:
+(2) Use step-(1) obtained augmented graphs to create a model-related Discgraph set with the unseen target graph with the commands like in:
 ```
 GNNEvaluator-git/2-MetaG_Gen.sh
 ```
