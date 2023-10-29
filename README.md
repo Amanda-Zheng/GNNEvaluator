@@ -9,7 +9,7 @@ The framework is:
 
 ![GNN_eval9](https://github.com/Amanda-Zheng/GNNEvaluator/assets/61812981/c7f5f661-274e-4b01-951a-4417dc75a802)
 
-You are welcome to cite our work
+Welcome to kindly cite our work and discuss with xin.zheng@monash.edu:
 
 ```
 @article{zheng2023gnnevaluator,
