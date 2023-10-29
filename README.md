@@ -1,4 +1,4 @@
-![image](https://github.com/Amanda-Zheng/GNNEvaluator/assets/61812981/64b06ecc-33b3-44a5-afbf-2b97c5d99c76)# GNNEvaluator: Evaluating GNN Performance On Unseen Graphs Without Labels
+# GNNEvaluator: Evaluating GNN Performance On Unseen Graphs Without Labels
 
 This is the Pytorch implementation for  NeurIPS-23:"GNNEvaluator: Evaluating GNN Performance On Unseen Graphs Without Labels"
 We are trying to solve the GNN evaluation problem when serving on unseen graphs without labels as:
