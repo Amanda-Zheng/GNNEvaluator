@@ -29,6 +29,7 @@ torch-scatter==2.1.0+pt113cu117
 torch-sparse==0.6.16+pt113cu117
 ```
 ## Instructions
+For the dataset, please check: https://drive.google.com/drive/folders/1RqfrAaXdINmklxbByKUoJxWCD1yfs_c_?usp=sharing
 ### For evaluating your own well-trained GNNs 
 (1) Run commands like in following to create a simulated distribution shift from your source graphs (used for training your GNNs)
 ```
